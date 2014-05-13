@@ -76,6 +76,7 @@ public class Executor implements Watcher, Runnable, DataMonitor.DataMonitorListe
 		}
 	}
 
+	private ZooKeeper zk;
 	private DataMonitor dm;
 
 	private String logFile;
@@ -95,7 +96,7 @@ public class Executor implements Watcher, Runnable, DataMonitor.DataMonitorListe
 		// This will route the watch callbacks to the data monitor, which can only be created after
 		// the Zookeeper client. In order to break the circular dependency we'll tell ZooKeeper
 		// to use the Executor class for all watch callbacks. This will route the watch callbacks to ... etc etc etc
-		ZooKeeper zk = new ZooKeeper(hostPort, 3000, this);
+		zk = new ZooKeeper(hostPort, 3000, this);
 
 		dm = new DataMonitor(zk, znode, null, this);
 	}
@@ -106,11 +107,20 @@ public class Executor implements Watcher, Runnable, DataMonitor.DataMonitorListe
 			synchronized (this) {
 				// Event processing loop
 				while (!dm.isDead()) {
+					System.out.println("Entering Event Loop");
 					wait();
 				}
 			}
 		} catch (InterruptedException e) {
 			e.printStackTrace();
+		}
+
+		if(zk.getState() == ZooKeeper.States.CONNECTED) {
+			try {
+				zk.close();
+			} catch (InterruptedException ie) {
+				throw new RuntimeException(ie);
+			}
 		}
 	}
 
@@ -127,6 +137,7 @@ public class Executor implements Watcher, Runnable, DataMonitor.DataMonitorListe
 	@Override
 	public void closing(int rc) {
 		synchronized (this) {
+			System.out.println("Notifying Event Loop for Shutdown");
 			notifyAll();
 		}
 	}

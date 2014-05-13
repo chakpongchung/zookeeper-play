@@ -31,9 +31,7 @@ public class DataMonitor implements Watcher, StatCallback {
 	// The data that existed at the ZNode on the last call
 	private byte prevData[];
 
-	public DataMonitor(
-			ZooKeeper zk, String znode, Watcher chainedWatcher,
-			DataMonitorListener listener)
+	public DataMonitor(ZooKeeper zk, String znode, Watcher chainedWatcher, DataMonitorListener listener)
 	{
 		this.zk = zk;
 		this.znode = znode;
@@ -66,11 +64,14 @@ public class DataMonitor implements Watcher, StatCallback {
 	@Override
 	public void process(WatchedEvent event) {
 		String path = event.getPath();
+		System.out.println("Received Watch Event!");
 		if (event.getType() == Event.EventType.None) {
 			// We are are being told that the state of the
 			// connection has changed
+			System.out.println("Recieved Event of Type none - Status : " + event.getState());
 			switch (event.getState()) {
 				case SyncConnected:
+					System.out.println("Re-Synchronized to Server");
 					// In this particular example we don't need to do anything
 					// here - watches are automatically re-registered with
 					// server and any watches triggered while the client was
@@ -78,13 +79,19 @@ public class DataMonitor implements Watcher, StatCallback {
 					break;
 				case Expired:
 					// Game over, man - GAME OVER
+					System.out.println("ZK Session expired!");
 					dead = true;
 					listener.closing(Code.SESSIONEXPIRED.intValue());
 					break;
+				case Disconnected:
+					// We've been disconnected from the server
+					// We may be able to recover.
+					System.out.println("Partitioned from ZK Ensemble. Awaiting reconnect...");
 			}
 		} else {
 			if (path != null && path.equals(znode)) {
 				// Something has changed on the node, let's find out
+				System.out.println("Checking if node exists");
 				zk.exists(znode, true, this, null);
 			}
 		}
@@ -97,6 +104,7 @@ public class DataMonitor implements Watcher, StatCallback {
 
 	@Override
 	public void processResult(int rc, String path, Object ctx, Stat stat) {
+		System.out.println("Received Stat Event!");
 		boolean exists;
 		switch (Code.get(rc)) {
 			case OK:
@@ -109,6 +117,9 @@ public class DataMonitor implements Watcher, StatCallback {
 			case NOAUTH:
 				dead = true;
 				listener.closing(rc);
+				return;
+			case CONNECTIONLOSS:
+				System.out.println("Could not reach ZK Ensemble");
 				return;
 			default:
 				// Retry errors
