@@ -1,4 +1,4 @@
-package zookeeper.play.watch;
+package play.zookeeper.watch;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
